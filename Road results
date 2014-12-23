@@ -1,0 +1,109 @@
+var submissionSSKey = '15KxGkjOV-H57JGzqHX5ANuGg9No0kqlHfYVzrOSwnZc';
+var docurl = 'https://docs.google.com/document/d/1C600spEUW-pvCXtvjLsQVj6kQayRcyHPd-Xfpyuss0w/edit?usp=sharing'
+var listitems = ['Select a category','Sucks','Eh','Okay','Nice','Amazing','Other', 'Green','Red','Blue', 'Orange', 'Yellow']
+var Panelstyle = {'background':'#dddddd','padding':'40px','borderStyle':'solid','borderWidth':'10PX','borderColor':'#bbbbbb'}
+
+function doGet() {
+  var app = UiApp.createApplication().setTitle('Road Conditions').setStyleAttribute('padding','50PX');
+  var panel = app.createFormPanel().setStyleAttributes(Panelstyle).setPixelSize(400, 200);
+  var title = app.createHTML('<B>Road Conditions</B>').setStyleAttribute('color','grey').setStyleAttribute('fontSize','25PX');
+  var grid = app.createGrid(7,2).setId('grid');
+  var list1 = app.createListBox().setName('list1').setWidth('130');
+   for(var i in listitems){list1.addItem(listitems[i])}    
+  var Textbox1 = app.createTextBox().setWidth('150px').setName('TB1');
+  var email = app.createTextBox().setWidth('150px').setName('mail');
+  var upLoad = app.createFileUpload().setName('uploadedFile');
+  var upLoad1 = app.createFileUpload().setName('uploadedFile1');
+  var submitButton = app.createSubmitButton('<B>Submit</B>'); 
+  var warning = app.createHTML('Please fill in all fields').setStyleAttribute('background','#bbbbbb').setStyleAttribute('fontSize','18px');
+  //file upload
+  var cliHandler2 = app.createClientHandler()
+  .validateLength(Textbox1, 1, 40).validateNotMatches(list1,'Select a category').validateEmail(email).validateNotMatches(upLoad, 'FileUpload');
+
+
+  var cliHandler3 = app.createClientHandler()
+  .validateNotMatches(upLoad1, 'FileUpload').forTargets(submitButton).setEnabled(true)
+  .forTargets(warning).setHTML('Now you can submit your form').setStyleAttribute('background','#99FF99').setStyleAttribute('fontsize','12px');
+
+  //Grid layout of items on form
+  grid.setWidget(0, 1, title)
+      .setText(1, 0, 'Category')
+      .setWidget(1, 1, list1.addClickHandler(cliHandler2))
+      .setText(2, 0, 'location')
+      .setWidget(2, 1, Textbox1.addClickHandler(cliHandler2))
+      .setText(3, 0, 'Email')
+      .setWidget(3, 1, email)
+      .setText(4, 0, 'Image File')
+      .setWidget(4, 1, upLoad.addChangeHandler(cliHandler2))
+      .setWidget(5, 1, upLoad1.addChangeHandler(cliHandler3))
+      .setWidget(6, 0, submitButton)
+      .setWidget(6, 1, warning);
+
+  var cliHandler = app.createClientHandler().forTargets(warning).setHTML('<B>PLEASE WAIT WHILE THE FILE IS UPLOADING<B>').setStyleAttribute('background','yellow');
+  submitButton.addClickHandler(cliHandler).setEnabled(false);  
+  panel.add(grid);
+  app.add(panel);
+  return app;
+}
+
+
+
+function doPost(e) {
+  var app = UiApp.getActiveApplication();
+  var ListVal = e.parameter.list1;
+  var textVal = e.parameter.TB1;
+  var Email = e.parameter.mail;
+  var fileBlob1 = e.parameter.uploadedFile;
+  var blob1 = fileBlob1.setContentTypeFromExtension()
+  var img1 = DocsList.createFile(blob1);
+  var fileBlob2 = e.parameter.uploadedFile1;
+  var blob2 = fileBlob2.setContentTypeFromExtension()
+  var img2 = DocsList.createFile(blob2);
+  try{
+  var folder = DocsList.getFolder('photos');
+  }catch(e){DocsList.createFolder('photos');var folder = DocsList.getFolder('photos')}
+  img1.addToFolder(folder);
+  img1.removeFromFolder(DocsList.getRootFolder());
+  img2.addToFolder(folder);
+  img2.removeFromFolder(DocsList.getRootFolder());
+  var weight1 = parseInt(img1.getSize()/1000);
+  var weight2 = parseInt(img2.getSize()/1000);
+  var sheet = SpreadsheetApp.openById(submissionSSKey).getSheetByName('Sheet1');
+  var lastRow = sheet.getLastRow();
+  var targetRange = sheet.getRange(lastRow+1, 1, 1, 5).setValues([[ListVal,textVal,Email,"https://drive.google.com/uc?export=view&id="+img1.getId(),"https://drive.google.com/uc?export=view&id="+img2.getId()]]);
+  var image1Insert = sheet.getRange(lastRow+1, 6).setFormula('=image("https://drive.google.com/uc?export=view&id='+img1.getId()+'")');
+  var image2Insert = sheet.getRange(lastRow+1, 7).setFormula('=image("https://drive.google.com/uc?export=view&id='+img2.getId()+'")');
+  sheet.setRowHeight(lastRow+1, 80);
+  var GDoc = DocumentApp.openByUrl(docurl)
+  GDoc.appendTable([['Category : '+ListVal,'Name : '+textVal,'Email : '+Email]])
+  var inlineI = GDoc.appendImage(img1);
+  var width = inlineI.getWidth();
+  var newW = width;
+  var height = inlineI.getHeight();
+  var newH = height;
+  var ratio = width/height;
+  Logger.log('w='+width+'h='+height+' ratio='+ratio);
+  if(width>640){
+  newW = 640;
+  newH = parseInt(newW/ratio);
+  }
+  inlineI.setWidth(newW).setHeight(newH)
+  GDoc.appendParagraph('IMAGE size : '+width+' x '+height+' (eventually) resized to '+newW+' x '+newH+' for PREVIEW ('+weight1+' kB)   ');
+  var inlineI = GDoc.appendImage(img2);
+  var width = inlineI.getWidth();
+  var newW = width;
+  var height = inlineI.getHeight();
+  var newH = height;
+  var ratio = width/height;
+  Logger.log('w='+width+'h='+height+' ratio='+ratio);
+  if(width>640){
+  newW = 640;
+  newH = parseInt(newW/ratio);
+  }
+  inlineI.setWidth(newW).setHeight(newH)
+  GDoc.appendParagraph('IMAGE size : '+width+' x '+height+' (eventually) resized to '+newW+' x '+newH+' for PREVIEW ('+weight2+' kB)   ');
+  GDoc.appendHorizontalRule();
+  GDoc.saveAndClose();
+  app.add(app.createLabel('Thank you for submitting'));
+  return app
+}
